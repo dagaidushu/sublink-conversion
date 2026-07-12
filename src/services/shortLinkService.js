@@ -14,17 +14,22 @@ export class ShortLinkService {
         return this.kv;
     }
 
-    async createShortLink(queryString, providedCode) {
+    async createShortLink(queryString, providedCode, target = '') {
         const kv = this.ensureKv();
         const shortCode = providedCode || generateWebPath();
         const ttl = this.options.shortLinkTtlSeconds;
         const putOptions = ttl ? { expirationTtl: ttl } : undefined;
-        await kv.put(shortCode, queryString, putOptions);
+        await kv.put(target ? `${target}:${shortCode}` : shortCode, queryString, putOptions);
         return shortCode;
     }
 
-    async resolveShortCode(code) {
+    async resolveShortCode(code, target = '') {
         const kv = this.ensureKv();
+        if (target) {
+            const targetedValue = await kv.get(`${target}:${code}`);
+            if (targetedValue) return targetedValue;
+        }
+        // Keep short links created before target-specific keys working.
         return kv.get(code);
     }
 }
