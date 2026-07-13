@@ -5,11 +5,6 @@ const SUBSCRIPTION_URI_PATTERN = /^(ss|vmess|vless|hysteria|hysteria2|hy2|trojan
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const MAX_CACHE_ENTRIES = 100;
-const subscriptionCache = new Map();
-const fetchNamespaces = new WeakMap();
-let nextFetchNamespace = 1;
 
 export class SubscriptionFetchError extends Error {
     constructor(message, code = 'fetch_failed') {
@@ -35,14 +30,6 @@ function isPrivateHostname(hostname) {
         (first === 192 && second === 168);
 }
 
-function getFetchNamespace() {
-    const fetchFn = globalThis.fetch;
-    if (!fetchNamespaces.has(fetchFn)) {
-        fetchNamespaces.set(fetchFn, nextFetchNamespace++);
-    }
-    return fetchNamespaces.get(fetchFn);
-}
-
 function validateSubscriptionUrl(value) {
     let url;
     try {
@@ -57,28 +44,6 @@ function validateSubscriptionUrl(value) {
         throw new SubscriptionFetchError('Private network subscription URLs are not allowed', 'private_address');
     }
     return url;
-}
-
-function cloneFetchResult(result) {
-    return { ...result };
-}
-
-function getCachedResult(cacheKey) {
-    const cached = subscriptionCache.get(cacheKey);
-    if (!cached) return null;
-    if (cached.expiresAt <= Date.now()) {
-        subscriptionCache.delete(cacheKey);
-        return null;
-    }
-    return cloneFetchResult(cached.value);
-}
-
-function cacheResult(cacheKey, value) {
-    if (subscriptionCache.size >= MAX_CACHE_ENTRIES) {
-        const oldestKey = subscriptionCache.keys().next().value;
-        if (oldestKey) subscriptionCache.delete(oldestKey);
-    }
-    subscriptionCache.set(cacheKey, { value: cloneFetchResult(value), expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
 async function readResponseText(response) {
@@ -122,12 +87,11 @@ async function readResponseText(response) {
 
 async function fetchSubscriptionResponse(urlValue, userAgent) {
     const initialUrl = validateSubscriptionUrl(urlValue);
-    const cacheKey = `${getFetchNamespace()}\n${initialUrl.toString()}\n${userAgent || ''}`;
-    const cached = getCachedResult(cacheKey);
-    if (cached) return { ...cached, cached: true };
 
     const headers = new Headers();
     if (userAgent) headers.set('User-Agent', userAgent);
+    headers.set('Cache-Control', 'no-cache');
+    headers.set('Pragma', 'no-cache');
     let currentUrl = initialUrl;
 
     for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
@@ -135,7 +99,14 @@ async function fetchSubscriptionResponse(urlValue, userAgent) {
         const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
         let response;
         try {
-            response = await fetch(currentUrl, { method: 'GET', headers, redirect: 'manual', signal: controller.signal });
+            response = await fetch(currentUrl, {
+                method: 'GET',
+                headers,
+                redirect: 'manual',
+                signal: controller.signal,
+                cache: 'no-store',
+                cf: { cacheTtl: 0 }
+            });
         } catch (error) {
             if (error?.name === 'AbortError') {
                 throw new SubscriptionFetchError('Subscription request timed out after 10 seconds', 'timeout');
@@ -164,7 +135,6 @@ async function fetchSubscriptionResponse(urlValue, userAgent) {
             subscriptionUserinfo: response.headers.get('subscription-userinfo') || undefined,
             cached: false
         };
-        cacheResult(cacheKey, result);
         return result;
     }
 
