@@ -81,6 +81,7 @@ export function createApp(bindings = {}) {
     });
 
     const singboxHandler = async (c) => {
+        setSubscriptionNoCacheHeaders(c);
         try {
             const config = getQuery(c, 'config');
             if (!config) {
@@ -140,6 +141,7 @@ export function createApp(bindings = {}) {
     app.get('/singbox', singboxHandler);
 
     const clashHandler = async (c) => {
+        setSubscriptionNoCacheHeaders(c);
         try {
             const config = getQuery(c, 'config');
             if (!config) {
@@ -192,6 +194,7 @@ export function createApp(bindings = {}) {
     app.get('/clash', clashHandler);
 
     const surgeHandler = async (c) => {
+        setSubscriptionNoCacheHeaders(c);
         try {
             const config = getQuery(c, 'config');
             if (!config) {
@@ -282,6 +285,7 @@ export function createApp(bindings = {}) {
     });
 
     const xrayHandler = async (c) => {
+        setSubscriptionNoCacheHeaders(c);
         const inputString = getQuery(c, 'config');
         if (!inputString) {
             return c.text('Missing config parameter', 400);
@@ -306,7 +310,11 @@ export function createApp(bindings = {}) {
         const finalProxyList = [];
         let subscriptionUserinfo;
         const userAgent = getQuery(c, 'ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
-        const headers = { 'User-Agent': userAgent };
+        const headers = {
+            'User-Agent': userAgent,
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        };
 
         for (const proxy of proxylist) {
             const trimmedProxy = proxy.trim();
@@ -314,7 +322,12 @@ export function createApp(bindings = {}) {
 
             if (trimmedProxy.startsWith('http://') || trimmedProxy.startsWith('https://')) {
                 try {
-                    const response = await fetch(trimmedProxy, { method: 'GET', headers });
+                    const response = await fetch(trimmedProxy, {
+                        method: 'GET',
+                        headers,
+                        cache: 'no-store',
+                        cf: { cacheTtl: 0 }
+                    });
                     const fetchedUserinfo = response.headers.get('subscription-userinfo');
                     if (fetchedUserinfo && subscriptionUserinfo === undefined) {
                         subscriptionUserinfo = fetchedUserinfo;
@@ -392,6 +405,7 @@ export function createApp(bindings = {}) {
     });
 
     const serveShortLink = (target, handler) => async (c) => {
+        setSubscriptionNoCacheHeaders(c);
         try {
             const code = c.req.param('code');
             const shortLinks = requireShortLinkService(services.shortLinks);
@@ -541,6 +555,15 @@ function parseBooleanFlag(value) {
     if (typeof value === 'boolean') return value;
     if (value === undefined || value === null) return false;
     return ['true', '1'].includes(String(value).trim().toLowerCase());
+}
+
+function setSubscriptionNoCacheHeaders(c) {
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    c.header('CDN-Cache-Control', 'no-store');
+    c.header('Cloudflare-CDN-Cache-Control', 'no-store');
+    c.header('Pragma', 'no-cache');
+    c.header('Expires', '0');
+    c.header('Vary', 'User-Agent');
 }
 
 function parseSemverLike(value) {
