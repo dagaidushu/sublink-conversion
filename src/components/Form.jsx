@@ -375,19 +375,19 @@ class="action-secondary px-6 py-3.5 rounded-lg font-semibold hover:bg-gray-50 da
               <input
                 type="text"
                 readonly
-                x-bind:value={`showFullLinks ? generatedLinks?.${field.key} : (shortenedLinks?.${field.key} || generatedLinks?.${field.key})`}
+                x-bind:value={`shortenedLinks?.${field.key} || generatedLinks?.${field.key}`}
                 class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:border-transparent transition-all duration-200 font-mono text-sm"
-                x-bind:class="shortenedLinks && !showFullLinks ? 'text-primary-600 dark:text-primary-400 font-semibold focus:ring-primary-500' : 'text-gray-600 dark:text-gray-400 focus:ring-green-500'"
+                x-bind:class="shortenedLinks ? 'text-primary-600 dark:text-primary-400 font-semibold focus:ring-primary-500' : 'text-gray-600 dark:text-gray-400 focus:ring-green-500'"
               />
               <button
                 type="button"
-                x-on:click={`navigator.clipboard.writeText((showFullLinks ? generatedLinks : (shortenedLinks || generatedLinks))?.${field.key}); copied = '${field.key}'; setTimeout(() => copied = null, 2000)`}
+                x-on:click={`navigator.clipboard.writeText((shortenedLinks || generatedLinks)?.${field.key}); copied = '${field.key}'; setTimeout(() => copied = null, 2000)`}
                 class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                 x-bind:class={`{
-                  'hover:bg-green-100 dark:hover:bg-green-900/30 hover:text-green-600 dark:hover:text-green-400': !shortenedLinks || showFullLinks,
-                  'hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400': shortenedLinks && !showFullLinks,
-                  'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400': (!shortenedLinks || showFullLinks) && copied === '${field.key}',
-                  'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400': shortenedLinks && !showFullLinks && copied === '${field.key}'
+                  'hover:bg-green-100 dark:hover:bg-green-900/30 hover:text-green-600 dark:hover:text-green-400': !shortenedLinks,
+                  'hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400': shortenedLinks,
+                  'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400': !shortenedLinks && copied === '${field.key}',
+                  'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400': shortenedLinks && copied === '${field.key}'
                 }`}
               >
                 <i class="fas" x-bind:class={`copied === '${field.key}' ? 'fa-check' : 'fa-copy'`}></i>
@@ -447,7 +447,7 @@ class="action-secondary px-6 py-3.5 rounded-lg font-semibold hover:bg-gray-50 da
         <div class="flex justify-center mt-4">
           <button
             type="button"
-            x-on:click="shortenedLinks ? showFullLinks = !showFullLinks : shortenLinks()"
+            x-on:click="shortenedLinks ? shortenedLinks = null : shortenLinks()"
             x-bind:disabled="!shortenedLinks && shortening"
             class="px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-lg"
             x-bind:class="shortenedLinks
@@ -456,10 +456,10 @@ class="action-secondary px-6 py-3.5 rounded-lg font-semibold hover:bg-gray-50 da
           >
             <i
               class="fas"
-              x-bind:class="shortenedLinks ? (showFullLinks ? 'fa-compress-alt' : 'fa-expand-alt') : (shortening ? 'fa-spinner fa-spin' : 'fa-compress-alt')"
+              x-bind:class="shortenedLinks ? 'fa-expand-alt' : (shortening ? 'fa-spinner fa-spin' : 'fa-compress-alt')"
             ></i>
             <span
-              x-text="shortenedLinks ? (showFullLinks ? shortenLinksText : showFullLinksText) : (shortening ? shorteningText : shortenLinksText)"
+              x-text="shortenedLinks ? showFullLinksText : (shortening ? shorteningText : shortenLinksText)"
             ></span>
           </button>
         </div>
