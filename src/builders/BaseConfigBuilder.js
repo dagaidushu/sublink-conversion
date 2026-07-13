@@ -4,6 +4,16 @@ import { createStableProviderName, deepCopy, tryDecodeSubscriptionLines, decodeB
 import { createTranslator } from '../i18n/index.js';
 import { generateRules, getOutbounds, PREDEFINED_RULE_SETS } from '../config/index.js';
 
+function isIgnorableSubscriptionLine(value) {
+    if (typeof value !== 'string') return true;
+    const line = value.trim();
+    if (!line || line.startsWith('#') || line.startsWith(';') || line.startsWith('//')) return true;
+
+    // A decoded node link always contains a URI scheme. Plain page headings and
+    // copied subscription descriptions should not be reported as broken nodes.
+    return !line.includes('://');
+}
+
 export class BaseConfigBuilder {
     constructor(inputString, baseConfig, lang, userAgent, groupByCountry = false, includeAutoSelect = true) {
         this.inputString = inputString;
@@ -87,6 +97,9 @@ export class BaseConfigBuilder {
 
             for (const processedUrl of processedUrls) {
                 const trimmedUrl = typeof processedUrl === 'string' ? processedUrl.trim() : '';
+                if (isIgnorableSubscriptionLine(trimmedUrl)) {
+                    continue;
+                }
 
                 // Check if it's an HTTP(S) URL - may use as provider if format matches
                 if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
