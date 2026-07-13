@@ -99,6 +99,7 @@ export const formLogicFn = (t) => {
             subconverterCopied: false,
             groupByCountry: false,
             includeAutoSelect: true,
+            allowInsecure: false,
             enableClashUI: false,
             externalController: '',
             externalUiDownloadUrl: '',
@@ -118,6 +119,7 @@ export const formLogicFn = (t) => {
             generatedLinks: null,
             shortenedLinks: null,
             conversionReport: null,
+            expandedReportTarget: null,
             inspecting: false,
             shortening: false,
             customShortCode: '',
@@ -154,6 +156,7 @@ export const formLogicFn = (t) => {
                 this.showAdvanced = localStorage.getItem('advancedToggle') === 'true';
                 this.groupByCountry = localStorage.getItem('groupByCountry') === 'true';
                 this.includeAutoSelect = localStorage.getItem('includeAutoSelect') !== 'false';
+                this.allowInsecure = localStorage.getItem('allowInsecure') === 'true';
                 this.enableClashUI = localStorage.getItem('enableClashUI') === 'true';
                 this.externalController = localStorage.getItem('externalController') || '';
                 this.externalUiDownloadUrl = localStorage.getItem('externalUiDownloadUrl') || '';
@@ -187,6 +190,7 @@ export const formLogicFn = (t) => {
                 this.$watch('showAdvanced', val => localStorage.setItem('advancedToggle', val));
                 this.$watch('groupByCountry', val => localStorage.setItem('groupByCountry', val));
                 this.$watch('includeAutoSelect', val => localStorage.setItem('includeAutoSelect', val));
+                this.$watch('allowInsecure', val => localStorage.setItem('allowInsecure', val));
                 this.$watch('enableClashUI', val => localStorage.setItem('enableClashUI', val));
                 this.$watch('externalController', val => localStorage.setItem('externalController', val));
                 this.$watch('externalUiDownloadUrl', val => localStorage.setItem('externalUiDownloadUrl', val));
@@ -416,6 +420,7 @@ export const formLogicFn = (t) => {
 
                     if (this.groupByCountry) params.append('group_by_country', 'true');
                     if (!this.includeAutoSelect) params.append('include_auto_select', 'false');
+                    if (this.allowInsecure) params.append('allow_insecure', 'true');
                     if (this.enableClashUI) params.append('enable_clash_ui', 'true');
                     if (this.externalController) params.append('external_controller', this.externalController);
                     if (this.externalUiDownloadUrl) params.append('external_ui_download_url', this.externalUiDownloadUrl);
@@ -428,9 +433,11 @@ export const formLogicFn = (t) => {
                     }
 
                     const queryString = params.toString();
+                    const rawParams = new URLSearchParams(params);
+                    rawParams.delete('allow_insecure');
 
                     this.generatedLinks = {
-                        xray: origin + '/xray?' + queryString,
+                        xray: origin + '/xray?' + rawParams.toString(),
                         xrayJson: origin + '/xray?format=json&' + queryString,
                         singbox: origin + '/singbox?' + queryString,
                         clash: origin + '/clash?' + queryString,
@@ -462,7 +469,11 @@ export const formLogicFn = (t) => {
                     const response = await fetch('/inspect', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ input: this.input, userAgent: this.customUA })
+                        body: JSON.stringify({
+                            input: this.input,
+                            userAgent: this.customUA,
+                            allowInsecure: this.allowInsecure
+                        })
                     });
                     if (!response.ok) throw new Error('Inspection request failed');
                     this.conversionReport = await response.json();
@@ -717,6 +728,7 @@ export const formLogicFn = (t) => {
                 // Extract other parameters
                 this.groupByCountry = params.get('group_by_country') === 'true';
                 this.includeAutoSelect = params.get('include_auto_select') !== 'false';
+                this.allowInsecure = params.get('allow_insecure') === 'true';
                 this.enableClashUI = params.get('enable_clash_ui') === 'true';
 
                 const externalController = params.get('external_controller');
@@ -741,7 +753,7 @@ export const formLogicFn = (t) => {
                 }
 
                 // Expand advanced options if any advanced settings are present
-                if (selectedRules || customRules || this.groupByCountry || this.enableClashUI ||
+                if (selectedRules || customRules || this.groupByCountry || this.allowInsecure || this.enableClashUI ||
                     externalController || externalUiDownloadUrl || ua || configId) {
                     this.showAdvanced = true;
                 }

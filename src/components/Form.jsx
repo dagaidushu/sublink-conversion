@@ -7,11 +7,11 @@ import { ValidatedTextarea } from './ValidatedTextarea.jsx';
 import { formLogicFn } from './formLogic.js';
 
 const LINK_FIELDS = [
-  { key: 'xray', labelKey: 'xrayLink' },
-  { key: 'xrayJson', label: 'Xray JSON' },
-  { key: 'singbox', labelKey: 'singboxLink' },
-  { key: 'clash', labelKey: 'clashLink' },
-  { key: 'surge', labelKey: 'surgeLink' }
+  { key: 'xray', labelKey: 'xrayLink', mode: 'passthrough' },
+  { key: 'xrayJson', label: 'Xray JSON', mode: 'converted' },
+  { key: 'singbox', labelKey: 'singboxLink', mode: 'converted' },
+  { key: 'clash', labelKey: 'clashLink', mode: 'converted' },
+  { key: 'surge', labelKey: 'surgeLink', mode: 'converted' }
 ];
 
 export const Form = (props) => {
@@ -182,6 +182,17 @@ export const Form = (props) => {
                 <div class="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" x-model="includeAutoSelect" class="sr-only peer" />
                   <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                </div>
+              </label>
+
+              <label class="flex items-center justify-between gap-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/30 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+                <span>
+                  <span class="block font-medium text-gray-700 dark:text-gray-300">{t('allowInsecure')}</span>
+                  <span class="block mt-1 text-xs text-amber-700 dark:text-amber-300">{t('allowInsecureTip')}</span>
+                </span>
+                <div class="relative inline-flex items-center cursor-pointer flex-none">
+                  <input type="checkbox" x-model="allowInsecure" class="sr-only peer" />
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 dark:peer-focus:ring-amber-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-amber-600"></div>
                 </div>
               </label>
 
@@ -368,8 +379,11 @@ class="action-secondary px-6 py-3.5 rounded-lg font-semibold hover:bg-gray-50 da
       <div class="mt-6 space-y-4">
         {LINK_FIELDS.map((field) => (
           <div class="relative group" key={field.key} x-show={`isLinkVisible('${field.key}')`}>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {field.label || t(field.labelKey)}
+            <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <span>{field.label || t(field.labelKey)}</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                {field.mode === 'passthrough' ? t('rawSubscription') : t('convertedConfig')}
+              </span>
             </label>
             <div class="flex gap-2">
               <input
@@ -401,23 +415,54 @@ class="action-secondary px-6 py-3.5 rounded-lg font-semibold hover:bg-gray-50 da
         <div class="flex items-center justify-between gap-3 mb-3">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <i class="fas fa-list-check text-primary-600"></i>
-            转换报告
+            {t('conversionReport')}
           </h3>
           <i x-show="inspecting" class="fas fa-spinner fa-spin text-primary-600"></i>
+        </div>
+        <div x-show="conversionReport?.overrides?.allowInsecure" class="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <i class="fas fa-triangle-exclamation mr-1"></i>
+          {t('insecureOverrideWarning')}
         </div>
         <div x-show="conversionReport" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <template x-for="target in conversionReport?.targets || []" x-bind:key="target.key">
             <div x-show="isReportVisible(target.key)" class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
               <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-medium text-gray-900 dark:text-white" x-text="target.label"></span>
-                <span class="text-xs font-semibold text-primary-700 dark:text-primary-300" x-text="`${target.converted} / ${conversionReport.total}`"></span>
+                <div class="min-w-0">
+                  <span class="text-sm font-medium text-gray-900 dark:text-white" x-text="target.label"></span>
+                  <span x-show="target.mode === 'passthrough'" class="ml-2 text-[11px] text-gray-500 dark:text-gray-400">{t('rawSubscription')}</span>
+                  <span x-show="target.mode !== 'passthrough'" class="ml-2 text-[11px] text-gray-500 dark:text-gray-400">{t('convertedConfig')}</span>
+                </div>
+                <button
+                  type="button"
+                  x-show="(target.warnings || []).length || target.skipped.length"
+                  x-on:click="expandedReportTarget = expandedReportTarget === target.key ? null : target.key"
+                  class="shrink-0 text-xs font-medium text-primary-700 hover:text-primary-900 dark:text-primary-300 dark:hover:text-primary-100"
+                >
+                  <span x-show="expandedReportTarget !== target.key">{t('reportShowDetails')}</span>
+                  <span x-show="expandedReportTarget === target.key">{t('reportHideDetails')}</span>
+                </button>
               </div>
-              <p x-show="target.skipped.length" class="mt-2 text-xs text-amber-700 dark:text-amber-300" x-text="target.skipped.map(item => `${item.name}: ${item.reason}`).join('；')"></p>
-              <p x-show="!target.skipped.length" class="mt-2 text-xs text-emerald-700 dark:text-emerald-300">全部节点可转换</p>
+              <div class="mt-2 grid grid-cols-3 gap-2 text-xs">
+                <span class="text-emerald-700 dark:text-emerald-300">{t('reportSuccess')}: <b x-text="target.success ?? target.converted"></b></span>
+                <span class="text-amber-700 dark:text-amber-300">{t('reportWarnings')}: <b x-text="target.warningCount ?? (target.warnings || []).length"></b></span>
+                <span class="text-red-700 dark:text-red-300">{t('reportSkipped')}: <b x-text="target.skipped.length"></b></span>
+              </div>
+              <p x-show="!(target.warnings || []).length && !target.skipped.length" class="mt-2 text-xs text-emerald-700 dark:text-emerald-300">{t('reportAllCompatible')}</p>
+              <div x-show="expandedReportTarget === target.key" class="mt-3 space-y-2 border-t border-gray-100 pt-3 dark:border-gray-700">
+                <template x-for="item in [...(target.warnings || []), ...target.skipped]" x-bind:key="`${item.name}-${item.code}`">
+                  <div class="text-xs leading-5">
+                    <span class="font-medium text-gray-800 dark:text-gray-200" x-text="`${item.name} (${item.type})`"></span>
+                    <p class="text-gray-600 dark:text-gray-400" x-text="item.reason"></p>
+                  </div>
+                </template>
+              </div>
             </div>
           </template>
         </div>
-        <p x-show="conversionReport?.parseIssues?.length" class="mt-3 text-xs text-red-600 dark:text-red-300" x-text="conversionReport.parseIssues.map(item => item.reason).join('；')"></p>
+        <div x-show="conversionReport?.parseIssues?.length" class="mt-3 text-xs text-red-600 dark:text-red-300">
+          <span class="font-semibold">{t('parseIssues')}:</span>
+          <span x-text="conversionReport?.parseIssues?.map(item => item.reason).join('；')"></span>
+        </div>
       </div>
 
       {/* Shortening Controls */}
